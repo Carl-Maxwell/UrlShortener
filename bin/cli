@@ -1,0 +1,58 @@
+
+class CommandLineInterface
+  def initialize
+    @user = retrieve_email
+    execute_action
+  end
+
+  def retrieve_email()
+    puts "Input your email:"
+    user = User.find_by_email(gets.chomp)
+
+    unless user
+      raise "That email doesn't exist!"
+    end
+
+    user
+  end
+
+  def pick_action
+    puts "What do you want to do?"
+    puts "0. Create shortened URL"
+    puts "1. Visit shortened URL"
+
+    gets.chomp.to_i
+  end
+
+  def execute_action
+    choice = pick_action
+    if choice == 0
+      create_shortened_url
+    elsif choice == 1
+      visit_shortened_url
+    else
+      raise "Invalid input"
+    end
+  end
+
+  def create_shortened_url
+    puts "Type in your long url"
+    long_url = gets.chomp
+    shortened_url = ShortenedUrl.create_for_user_and_long_url(@user, long_url)
+    puts "Short url is: #{shortened_url.short_url}"
+  end
+
+  def visit_shortened_url
+    puts "Type in the shortened URL"
+    short_url = gets.chomp
+    shortened_url = ShortenedUrl.find_by_short_url(short_url)
+    unless shortened_url
+      raise "Not a valid shortened URL"
+    end
+    Launchy.open(shortened_url.long_url)
+    Visit.record_visit!(@user, shortened_url)
+  end
+
+end
+
+CommandLineInterface.new
