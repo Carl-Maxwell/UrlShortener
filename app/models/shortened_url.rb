@@ -1,6 +1,9 @@
 class ShortenedUrl < ActiveRecord::Base
   validates :short_url, presence: true, uniqueness: true
   validates :submitter_id, presence: true
+  validates :long_url, presence: true, length: { maximum: 255 }
+  validate :submitter_cannot_be_a_spammer
+  validate :regular_user_limit
 
   belongs_to(
     :submitter,
@@ -21,6 +24,19 @@ class ShortenedUrl < ActiveRecord::Base
     Proc.new { distinct },
     through: :visits,
     source: :visitor
+  )
+
+  has_many(
+    :taggings,
+    foreign_key: :shortened_url_id,
+    primary_key: :id,
+    class_name: :Tagging
+  )
+
+  has_many(
+    :topics,
+    through: :taggings,
+    source: :topic
   )
 
   def self.random_code
@@ -56,5 +72,28 @@ class ShortenedUrl < ActiveRecord::Base
   def num_recent_uniques
     recents = visits.where("created_at >= ?", 10.minutes.ago)
     recents.select(:user_id).distinct.count
+  end
+
+  def submitter_cannot_be_a_spammer
+    if User.find(submitter_id).recent_submissions_count >= 5
+      errors.add(:submitter_id, "cannot submit more than 5 URLs in a minute")
+    end
+  end
+
+  def regular_user_limit
+    submitter = User.find(submitter_id)
+    unless submitter.is_premium || submitter.shortened_urls.count < 5
+      errors.add(:submitter_id, "cannot submit more than 5 URLS unless premium")
+    end
+  end
+
+  def self.prune(n)
+    ids = self.all.joins(:visits)
+      .group(:shortened_url_id)
+      .having("MAX(visits.created_at) < ?", n.minutes.ago)
+      .select('shortened_urls.id')
+      .map(&:id)
+
+    self.destroy_all(id: ids)
   end
 end

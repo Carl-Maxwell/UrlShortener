@@ -21,4 +21,9 @@ class User < ActiveRecord::Base
     through: :visits,
     source: :shortened_url
   )
+
+  def recent_submissions_count
+    shortened_urls.where("created_at >= ?", 1.minutes.ago).count
+  end
+
 end
