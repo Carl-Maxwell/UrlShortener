@@ -88,12 +88,15 @@ class ShortenedUrl < ActiveRecord::Base
   end
 
   def self.prune(n)
-    ids = self.all.joins(:visits)
+    ids = self.all
+      .joins("JOIN users ON users.id = shortened_urls.submitter_id")
+      .where("users.is_premium = FALSE")
+      .joins(:visits)
       .group(:shortened_url_id)
       .having("MAX(visits.created_at) < ?", n.minutes.ago)
       .select('shortened_urls.id')
       .map(&:id)
 
-    self.destroy_all(id: ids)
+    #self.destroy_all(id: ids)
   end
 end
